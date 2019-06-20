@@ -9,7 +9,7 @@ let request = OverpassRequest {
     Union {
         Query(.way) {
             Bounding(.box(s: 51.248, w: 7.147, n: 51.252, e: 7.153))
-            HasKV(key: "highway")
+            Tag(include: "highway")
         }
 
         Recurse(.down)
@@ -19,17 +19,30 @@ let request = OverpassRequest {
 }
 ```
 
-Another example (shelters adjacent to roads with bus stops):
-
+Another example (select all buildings):
 ```swift
 let request = OverpassRequest {
-    Query(.node, into: "shelters") {
-        Bounding(.box(s: 51.248, w: 7.147, n: 51.252, e: 7.153))
-        HasKV(key: "highway", value: "bus_stop")
-        HasKV(key: "shelter", value: "yes")
+    Union {
+        Union {
+            Query(.way) {
+                Bounding(.box(s: 51.248, w: 7.147, n: 51.252, e: 7.153))
+                Tag(include: "building")
+            }
+
+            Recurse(.down)
+        }
+
+        Union {
+            Query(.relation) {
+                Bounding(.box(s: 51.248, w: 7.147, n: 51.252, e: 7.153))
+                Tag(include: "building")
+            }
+
+            Recurse(.down)
+        }
     }
 
-    Print(.skeleton, from: "shelters")
+    Print()
 }
 ```
 
@@ -41,7 +54,7 @@ let request = OverpassRequest {
         Union(into: String(index)) {
             Query(.way) {
                 Bounding(bound)
-                HasKV(key: "highway", regex: "motorway|trunk")
+                Tag("highway", matches: "motorway|trunk")
             }
 
 

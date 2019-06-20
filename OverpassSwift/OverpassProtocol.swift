@@ -110,7 +110,8 @@ public enum OverpassResponse {
 
     internal init(bounds: OverpassBounds, data: Data) {
         var nodeMap: [OverpassId: Node] = [:]
-        var interimWayArray: [InterimWay] = []
+        var interimWayMap: [OverpassId: InterimWay] = [:]
+        var interimRelations: [InterimRelation] = []
         
         // parse data
         let document = XMLDocument(data: data)
@@ -138,7 +139,39 @@ public enum OverpassResponse {
                         break
                     }
                 }
-                interimWayArray.append(InterimWay(id: id, references: references, tags: tags))
+                interimWayMap[id] = InterimWay(id: id, references: references, tags: tags)
+                
+            case "relation":
+                guard let id = child["id"] else { continue }
+                var tags: [String: String] = [:]
+                var wayRefs: [(OverpassId, String)] = []
+                var nodeRefs: [OverpassId] = []
+                for relChild in child.children {
+                    switch relChild.name {
+                    case "tag":
+                        guard let k = relChild["k"], let v = relChild["v"] else { break }
+                        tags[k] = v
+                    case "member":
+                        guard let type = relChild["type"] else { break }
+                        switch type {
+                        case "way":
+                            guard let id = relChild["ref"] else { break }
+                            guard let role = relChild["role"] else { break }
+                            wayRefs.append((id, role))
+                        case "node":
+                            guard let id = relChild["ref"] else { break }
+                            nodeRefs.append(id)
+                        default:
+                            break
+                        }
+                    default:
+                        break
+                    }
+                }
+                interimRelations.append(InterimRelation(id: id,
+                                                        wayRefs: wayRefs,
+                                                        nodeRefs: nodeRefs,
+                                                        tags: tags))
                 
             default:
                 break
@@ -146,19 +179,39 @@ public enum OverpassResponse {
         }
         
         // filter out intermediate values
-        var ways: [Way] = []
+        var relations: [Relation] = []
+        var wayMap: [OverpassId: Way] = [:]
+        var referencedWayKeys: [OverpassId] = []
         var referencedNodeKeys: [OverpassId] = []
-        for interimWay in interimWayArray {
+        
+        for interimWay in interimWayMap.values {
             let referencedNodes = interimWay.references.compactMap { nodeMap[$0] }
-            ways.append(interimWay.elevate(referencedNodes))
+            wayMap[interimWay.id] = interimWay.elevate(referencedNodes)
             
             referencedNodeKeys.append(contentsOf: referencedNodes.map { $0.id })
         }
+
+        for interimRelation in interimRelations {
+            let referencedNodes = interimRelation.nodeRefs.compactMap { nodeMap[$0] }
+            let referencedWays = interimRelation.wayRefs.compactMap { wayMap[$0.0] }
+            relations.append(interimRelation.elevate(referencedWays, referencedNodes))
+            
+            referencedNodeKeys.append(contentsOf: referencedNodes.map { $0.id })
+            referencedWayKeys.append(contentsOf: referencedWays.map { $0.id })
+        }
         
+        // leave only lone nodes and ways
+        for referencedWayKey in referencedWayKeys {
+            wayMap.removeValue(forKey: referencedWayKey)
+        }
+
         for referencedNodeKey in referencedNodeKeys {
             nodeMap.removeValue(forKey: referencedNodeKey)
         }
         
-        self = .result(result: OverpassResult(bounds: bounds, ways: ways, loneNodes: Array(nodeMap.values)))
+        self = .result(result: OverpassResult(bounds: bounds,
+                                              relations: relations,
+                                              ways: Array(wayMap.values),
+                                              loneNodes: Array(nodeMap.values)))
     }
 }

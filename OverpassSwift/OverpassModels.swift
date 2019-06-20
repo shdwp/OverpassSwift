@@ -106,7 +106,6 @@ public extension Way {
     static func +=(_ lhs: inout Way, _ rhs: Way) {
         lhs = lhs + rhs
     }
-    
 }
 
 /// Intermediate struct used during parsing
@@ -116,9 +115,80 @@ internal struct InterimWay {
     public let tags: [String: String]
     
     internal func elevate(_ nodes: [Node]) -> Way {
-        return Way(id: self.id,
-                   nodes: nodes,
-                   tags: self.tags)
+        Way(id: self.id,
+            nodes: nodes,
+            tags: self.tags)
+    }
+}
+
+// MARK: Relation
+/// Structure representing relation
+@dynamicMemberLookup
+public struct Relation: Equatable {
+    public let id: OverpassId
+    /// array of included ways
+    public let ways: [Way]
+    /// array of included nodes
+    public let nodes: [Node]
+    /// tags
+    public let tags: [String: String]
+}
+
+extension Relation: Hashable {
+    public func hash(into hasher: inout Hasher) {
+        hasher.combine(self.id)
+    }
+}
+
+// MARK: Relation: dynamicMemberLookup
+public extension Relation {
+    subscript(dynamicMember key: String) -> String? {
+        get {
+            return self.tags[key]
+        }
+    }
+}
+
+// MARK: Relation: Operators
+public extension Relation {
+    static func +(_ lhs: Relation, _ rhs: Relation) -> Relation {
+        if lhs == rhs {
+            var ways = lhs.ways.map({ (way) -> Way in
+                if let rhsWay = rhs.ways.first(where: { $0 == way }) {
+                    return way + rhsWay
+                } else {
+                    return way
+                }
+            })
+            
+            ways.append(contentsOf: rhs.ways.filter({ way in !ways.contains(where: { $0 == way }) }))
+            
+            return Relation(id: lhs.id,
+                            ways: ways,
+                            nodes: Array(lhs.nodes + rhs.nodes.filter( { !lhs.nodes.contains($0) })),
+                            tags: lhs.tags)
+        } else {
+            return lhs
+        }
+    }
+    
+    static func +=(_ lhs: inout Relation, _ rhs: Relation) {
+        lhs = lhs + rhs
+    }
+}
+
+/// Intermediate struct used during parsing
+internal struct InterimRelation {
+    public let id: OverpassId
+    public let wayRefs: [(OverpassId, String)]
+    public let nodeRefs: [OverpassId]
+    public let tags: [String: String]
+    
+    func elevate(_ ways: [Way], _ nodes: [Node]) -> Relation {
+        Relation(id: self.id,
+                 ways: ways,
+                 nodes: nodes,
+                 tags: self.tags)
     }
 }
 
@@ -127,6 +197,8 @@ internal struct InterimWay {
 public struct OverpassResult {
     /// bounds of the result (either taken from request or calculated during results merge)
     public let bounds: OverpassBounds
+    /// relations
+    public let relations: [Relation]
     /// array of ways
     public let ways: [Way]
     /// array of nodes that weren't attached to other objects in the result
@@ -135,7 +207,7 @@ public struct OverpassResult {
 
 extension OverpassResult: CustomStringConvertible {
     public var description: String {
-        return "result(\(self.bounds), ways \(self.ways.count), loneNodes \(self.loneNodes.count))"
+        return "result(\(self.bounds), relations \(self.relations.count), ways \(self.ways.count), loneNodes \(self.loneNodes.count))"
     }
 }
 
@@ -147,6 +219,16 @@ public extension OverpassResult {
     /// - Parameter bounds: explicit bounds
     /// - Returns: merged result
     func expanded(with result: OverpassResult, newBounds bounds: OverpassBounds) -> OverpassResult {
+        var relations = self.relations.map({ (relation) -> Relation in
+            if let anotherRelation = result.relations.first(where: { $0 == relation }) {
+                return relation + anotherRelation
+            } else {
+                return relation
+            }
+        })
+        
+        relations.append(contentsOf: result.relations.filter { !relations.contains($0) })
+        
         var ways = self.ways.map({ (way) -> Way in
             if let anotherWay = result.ways.first(where: { $0 == way }) {
                 return way + anotherWay
@@ -156,7 +238,9 @@ public extension OverpassResult {
         })
         
         ways.append(contentsOf: result.ways.filter { !ways.contains($0) })
+        
         return OverpassResult(bounds: bounds,
+                              relations: relations,
                               ways: ways,
                               loneNodes: Array(Set(self.loneNodes + result.loneNodes)))
     }

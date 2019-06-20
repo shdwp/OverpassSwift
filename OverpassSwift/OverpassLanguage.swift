@@ -104,7 +104,7 @@ public struct Query: OverpassStatement {
     public enum QType: String {
         case node = "node"
         case way = "way"
-        case relation = "rel"
+        case relation = "relation"
         case area = "area"
     }
 
@@ -189,18 +189,18 @@ public struct Recurse: OverpassStatement {
 }
 
 // MARK: Filters
-public struct HasKV: OverpassStatement {
+public struct Tag: OverpassStatement {
     public var name = "has-kv"
     public var contents: [OverpassStatement] = []
     public var properties: [String: String] = [:]
     
-    public init(hasKey key: String) {
+    public init(include key: String) {
         self.properties = [
             "k": key,
         ]
     }
 
-    public init(key: String, equals: Bool, value: String) {
+    internal init(_ key : String, equals: Bool, value: String) {
         self.properties = [
             "k": key,
             "v": value,
@@ -211,11 +211,7 @@ public struct HasKV: OverpassStatement {
         }
     }
     
-    public init(key: String, value: String) {
-        self.init(key: key, equals: true, value: value)
-    }
-    
-    public init(key: String, equals: Bool, regex: String) {
+    internal init(_ key: String, equals: Bool, regex: String) {
         self.properties = [
             "k": key,
             "regv": regex,
@@ -225,9 +221,21 @@ public struct HasKV: OverpassStatement {
             self.properties["modv"] = "not"
         }
     }
+
+    public init(_ key : String, equals value: String) {
+        self.init(key, equals: true, value: value)
+    }
     
-    public init(key: String, regex: String) {
-        self.init(key: key, equals: true, regex: regex)
+    public init(_ key : String, notEquals value: String) {
+        self.init(key, equals: false, value: value)
+    }
+    
+    public init(_ key: String, matches regex: String) {
+        self.init(key, equals: true, regex: regex)
+    }
+    
+    public init(_ key: String, notMatches regex: String) {
+        self.init(key, equals: false, regex: regex)
     }
 }
 
