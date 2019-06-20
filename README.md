@@ -1,6 +1,8 @@
-Swift client for OpenStreetMap Overpass API.
+Swift client for OpenStreetMap **Overpass API**.
 
-Uses @functionBuilder to provide in-language DSL for query construction and Combine framework to propagate results.
+Uses `@functionBuilder` to provide in-language DSL for query construction and `Combine` framework to propagate results.
+
+Example project: [cmrnavig](https://github.com/shdwp/cmrnavig)
 
 Example request (this will select roads in the coordinate bounding box):
 
@@ -44,8 +46,7 @@ let request = OverpassRequest {
                 HasKV(key: "highway", regex: "motorway|trunk")
             }
 
-
-            If true {
+            If(true) {
                 Recurse(.down)
             } {
                 Recurse(.up)
