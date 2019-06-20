@@ -1,6 +1,8 @@
-Swift client for OpenStreetMap Overpass API.
+Swift client for OpenStreetMap **Overpass API**.
 
-Uses @functionBuilder to provide in-language DSL for query construction and Combine framework to propagate results.
+Uses `@functionBuilder` to provide in-language DSL for query construction and `Combine` framework to propagate results.
+
+Example project: [cmrnavig](https://github.com/shdwp/cmrnavig)
 
 Example request (this will select roads in the coordinate bounding box):
 
@@ -22,19 +24,10 @@ let request = OverpassRequest {
 Another example (select all buildings):
 ```swift
 let request = OverpassRequest {
-    Union {
+    ForEach([Query.QueryType.relation, Query.QueryType.node]) { queryType in
         Union {
-            Query(.way) {
-                Bounding(.box(s: 51.248, w: 7.147, n: 51.252, e: 7.153))
-                Tag(include: "building")
-            }
-
-            Recurse(.down)
-        }
-
-        Union {
-            Query(.relation) {
-                Bounding(.box(s: 51.248, w: 7.147, n: 51.252, e: 7.153))
+            Query(queryType) {
+                Bounding(bound)
                 Tag(include: "building")
             }
 
@@ -57,8 +50,7 @@ let request = OverpassRequest {
                 Tag("highway", matches: "motorway|trunk")
             }
 
-
-            If true {
+            If(true) {
                 Recurse(.down)
             } {
                 Recurse(.up)

@@ -101,7 +101,7 @@ public struct Union: OverpassStatement {
 
 // MARK: Query
 public struct Query: OverpassStatement {
-    public enum QType: String {
+    public enum QueryType: String {
         case node = "node"
         case way = "way"
         case relation = "relation"
@@ -112,29 +112,29 @@ public struct Query: OverpassStatement {
     public var contents: [OverpassStatement] = []
     public var properties: [String: String] = [:]
 
-    public init(_ t: QType, _ into: String = "_") {
+    public init(_ t: QueryType, _ into: String = "_") {
         self.properties = [
             "type": t.rawValue,
             "into": into,
         ]
     }
     
-    public init(_ t: QType, @OFBuilder _ content: OFBuilderSClosure) {
+    public init(_ t: QueryType, @OFBuilder _ content: OFBuilderSClosure) {
         self.init(t)
         self.contents = [content(), ]
     }
     
-    public init(_ t: QType, @OFBuilder _ contents: OFBuilderMClosure) {
+    public init(_ t: QueryType, @OFBuilder _ contents: OFBuilderMClosure) {
         self.init(t)
         self.contents = contents()
     }
     
-    public init(_ t: QType, into: String, @OFBuilder _ content: OFBuilderSClosure) {
+    public init(_ t: QueryType, into: String, @OFBuilder _ content: OFBuilderSClosure) {
         self.init(t, into)
         self.contents = [content(), ]
     }
     
-    public init(_ t: QType, into: String, @OFBuilder _ contents: OFBuilderMClosure) {
+    public init(_ t: QueryType, into: String, @OFBuilder _ contents: OFBuilderMClosure) {
         self.init(t, into)
         self.contents = contents()
     }
@@ -145,19 +145,19 @@ public struct IdQuery: OverpassStatement {
     public var contents: [OverpassStatement] = []
     public var properties: [String: String] = [:]
     
-    public init(_ t: Query.QType, ref: OverpassId) {
+    public init(_ t: Query.QueryType, ref: OverpassId) {
         self.properties = [
             "type": t.rawValue,
             "ref": ref,
         ]
     }
     
-    public init(_ t: Query.QType, ref: OverpassId, @OFBuilder _ content: OFBuilderSClosure) {
+    public init(_ t: Query.QueryType, ref: OverpassId, @OFBuilder _ content: OFBuilderSClosure) {
         self.init(t, ref: ref)
         self.contents = [content(), ]
     }
     
-    public init(_ t: Query.QType, ref: OverpassId, @OFBuilder _ contents: OFBuilderMClosure) {
+    public init(_ t: Query.QueryType, ref: OverpassId, @OFBuilder _ contents: OFBuilderMClosure) {
         self.init(t, ref: ref)
         self.contents = contents()
     }
