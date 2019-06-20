@@ -10,40 +10,39 @@ import Foundation
 import SwiftUI
 
 // MARK: Request
+/// Request struct. Holds a tree of OverpassStatements and serializes them to the XML
 public struct OverpassRequest {
     internal let statement: OverpassStatement
-    internal var box: OverpassBox
+    internal var bounds: OverpassBounds
     
     public init(@OFBuilder _ content: OFBuilderSClosure) {
-        self.statement = content()
-        self.box = .arbitrary
+        self.statement = Script {
+            content()
+        }
+        
+        self.bounds = .arbitrary
         self.setupBox()
     }
     
     public init(@OFBuilder _ contents: OFBuilderMClosure) {
         self.statement = Script(contents)
-        self.box = .arbitrary
+        self.bounds = .arbitrary
         self.setupBox()
     }
     
+    /// Set the bound variable based on the statement tree
     mutating internal func setupBox() {
         for statement in self {
-            if let query = statement as? BoundingBoxQuery {
-                guard
-                    let s = OverpassCoordinate(query.properties["s"] ?? ""),
-                    let w = OverpassCoordinate(query.properties["w"] ?? ""),
-                    let n = OverpassCoordinate(query.properties["n"] ?? ""),
-                    let e = OverpassCoordinate(query.properties["e"] ?? "")
-                    else { continue }
-                    
-                self.box = .bounding(s: s, w: w, n: n, e: e)
+            if let query = statement as? Bounding {
+                self.bounds = query.bounds
             }
         }
     }
 }
 
+/// Internal recursive OverpassRequest iterator
 extension OverpassRequest: Sequence {
-    public struct RequestIterator: IteratorProtocol {
+    public struct _RequestIterator: IteratorProtocol {
         public typealias Element = OverpassStatement
         var iterators: [AnyIterator<OverpassStatement>]
 
@@ -60,9 +59,9 @@ extension OverpassRequest: Sequence {
     }
     
     public typealias Element = OverpassStatement
-    public typealias Iterator = RequestIterator
+    public typealias Iterator = _RequestIterator
     
-     public func makeIterator() -> OverpassRequest.RequestIterator {
+     public func makeIterator() -> OverpassRequest._RequestIterator {
         var iterators: [AnyIterator<OverpassStatement>] = []
         func fillIterators(_ statement: OverpassStatement) {
             iterators.append(AnyIterator(statement.contents.makeIterator()))
@@ -72,20 +71,25 @@ extension OverpassRequest: Sequence {
         }
 
         fillIterators(self.statement)
-        return RequestIterator(iterators: iterators)
+        return _RequestIterator(iterators: iterators)
     }
 }
 
 internal extension OverpassRequest {
+    /// XML request data
     var requestData: Data {
         func append(_ node: XMLNode, _ statement: OverpassStatement) {
             for childStatement in statement.contents {
-                let childNode = node.add(childStatement.name)
-                for (k, v) in childStatement.properties {
-                    childNode[k] = v
+                if childStatement.name.isEmpty {
+                    append(node, childStatement)
+                } else {
+                    let childNode = node.add(childStatement.name)
+                    for (k, v) in childStatement.properties {
+                        childNode[k] = v
+                    }
+                    
+                    append(childNode, childStatement)
                 }
-                
-                append(childNode, childStatement)
             }
         }
         
@@ -97,11 +101,14 @@ internal extension OverpassRequest {
 }
 
 // MARK: Response
+/// Enum representing server response
 public enum OverpassResponse {
+    /// request success, providing OverpassResult
     case result(result: OverpassResult)
+    /// request failure
     case error
 
-    internal init(box: OverpassBox, data: Data) {
+    internal init(bounds: OverpassBounds, data: Data) {
         var nodeMap: [OverpassId: Node] = [:]
         var interimWayArray: [InterimWay] = []
         
@@ -113,7 +120,7 @@ public enum OverpassResponse {
                 guard let latText = child["lat"], let lat = Double(latText) else { continue }
                 guard let lonText = child["lon"], let lon = Double(lonText) else { continue }
                 guard let id = child["id"] else { continue }
-                nodeMap[id] = Node(id: id, location: OverpassLocation(lat: lat, lon: lon))
+                nodeMap[id] = Node(id: id, location: OverpassPoint(lat: lat, lon: lon))
                 
             case "way":
                 guard let id = child["id"] else { continue }
@@ -152,6 +159,6 @@ public enum OverpassResponse {
             nodeMap.removeValue(forKey: referencedNodeKey)
         }
         
-        self = .result(result: OverpassResult(box: box, ways: ways, loneNodes: Array(nodeMap.values)))
+        self = .result(result: OverpassResult(bounds: bounds, ways: ways, loneNodes: Array(nodeMap.values)))
     }
 }

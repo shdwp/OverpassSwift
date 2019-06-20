@@ -9,8 +9,10 @@
 import Foundation
 import libxml2
 
+/// Tiny wrapper around libxml2
+
 // MARK: XMLDocument
-public class XMLDocument {
+internal class XMLDocument {
     internal let ptr: xmlDocPtr
     public var root: XMLNode
 
@@ -49,7 +51,7 @@ extension XMLDocument: CustomStringConvertible {
 }
 
 // MARK: XMLNode
-public class XMLNode {
+internal class XMLNode {
     internal let ptr: xmlNodePtr
     
     init(_ ptr: xmlNodePtr) {

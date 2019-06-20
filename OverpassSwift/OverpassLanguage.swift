@@ -9,6 +9,12 @@
 import Foundation
 
 // MARK: FunctionBuilder
+/**
+ Note: `@functionBuilder` is in beta as of time when this was written,
+ therefore code include a couple of workarounds:
+ - `If` helper instead of `buildIf` family of methods
+ - Separate constructors for single and many elements
+ */
 @_functionBuilder public struct OFBuilder  {
     public typealias T = OverpassStatement
 
@@ -16,38 +22,25 @@ import Foundation
         return []
     }
     
-    public static func buildBlock(_ a: T) -> [T] {
-        return [a, ]
-    }
-
-    public static func buildBlock(_ a: T, _ b: T) -> [T] {
-        return [a, b, ]
-    }
-    
-    public static func buildBlock(_ a: T, _ b: T, _ c: T) -> [T] {
-        return [a, b, c, ]
-    }
-    
-    public static func buildBlock(_ a: T, _ b: T, _ c: T, _ d: T) -> [T] {
-        return [a, b, c, d, ]
-    }
-    
-    public static func buildBlock(_ a: T, _ b: T, _ c: T, _ d: T, _ e: T) -> [T] {
-        return [a, b, c, d, e, ]
-    }
-    
-    public static func buildBlock(_ a: T, _ b: T, _ c: T, _ d: T, _ e: T, _ f: T) -> [T] {
-        return [a, b, c, d, e, f, ]
+    public static func buildBlock(_ a: T...) -> [T] {
+        return a
     }
 }
 
+// closure types for @OFBuilder arguments
 public typealias OFBuilderMClosure = () -> [OverpassStatement]
 public typealias OFBuilderSClosure = () -> OverpassStatement
 
 // MARK: Protocol
+/// General statement protocol, which will be turned to XML for the request
 public protocol OverpassStatement {
+    /// name of the statement, goes in as a tag name. Empty name will not create new tag, contents will be put directly into parent
     var name: String { get }
+    
+    /// properties, go into properties
     var properties: [String: String] { get }
+    
+    /// child statements
     var contents: [OverpassStatement] { get }
 }
 
@@ -60,7 +53,7 @@ public struct Script: OverpassStatement {
     public init() {
         self.properties = [
             "timeout": "10",
-            "element-limit": "1073741824",
+            "element-limit": "50000",
         ]
     }
     
@@ -135,32 +128,15 @@ public struct Query: OverpassStatement {
         self.init(t)
         self.contents = contents()
     }
-}
-
-public struct BoundingBoxQuery: OverpassStatement {
-    public var name = "bbox-query"
-    public var contents: [OverpassStatement] = []
-    public var properties: [String: String] = [:]
     
-    public init(s: OverpassCoordinate, w: OverpassCoordinate, n: OverpassCoordinate, e: OverpassCoordinate) {
-        self.properties = [
-            "s": String(s),
-            "w": String(w),
-            "n": String(n),
-            "e": String(e),
-        ]
+    public init(_ t: QType, into: String, @OFBuilder _ content: OFBuilderSClosure) {
+        self.init(t, into)
+        self.contents = [content(), ]
     }
-}
-
-public struct PolygonQuery: OverpassStatement {
-    public var name = "polygon-query"
-    public var contents: [OverpassStatement] = []
-    public var properties: [String: String] = [:]
     
-    public init(bounds: [OverpassCoordinate]) {
-        self.properties = [
-            "bounds": bounds.map({ String($0) }).joined(separator: " "),
-        ]
+    public init(_ t: QType, into: String, @OFBuilder _ contents: OFBuilderMClosure) {
+        self.init(t, into)
+        self.contents = contents()
     }
 }
 
@@ -255,15 +231,46 @@ public struct HasKV: OverpassStatement {
     }
 }
 
-public struct Around: OverpassStatement {
-    public var name = "around"
+public struct Bounding: OverpassStatement {
+    internal let bounds: OverpassBounds
+    
+    public var name: String {
+        switch self.bounds {
+        case .box:
+            return "bbox-query"
+        case .area:
+            return "around"
+        case .polygon:
+            return "polygon-query"
+        case .arbitrary:
+            return "query"
+        }
+    }
+    
     public var contents: [OverpassStatement] = []
     public var properties: [String: String] = [:]
     
-    public init(radius: OverpassDistance) {
-        self.properties = [
-            "radius": String(radius),
-        ]
+    public init(_ bounds: OverpassBounds) {
+        self.bounds = bounds
+        switch bounds {
+        case .box(let s, let w, let n, let e):
+            self.properties = [
+                "s": String(s),
+                "w": String(w),
+                "n": String(n),
+                "e": String(e),
+            ]
+        case .area(_, let area):
+            self.properties = [
+                "radius": String(area),
+            ]
+        case .polygon(let points):
+            self.properties = [
+                "bounds": points.map({ "\($0.lat) \($0.lon)" }).joined(separator: " "),
+            ]
+        default:
+            break
+        }
     }
 }
 
@@ -290,8 +297,81 @@ public struct Print: OverpassStatement {
     public init(_ m: PrintType) {
         self.init(m, from: "_")
     }
+    
+    public init(from: String) {
+        self.init(.body, from: from)
+    }
 
     public init() {
         self.init(.body)
+    }
+}
+
+// MARK: Helpers
+public struct ForEach<T>: OverpassStatement {
+    public var name = ""
+    public var contents: [OverpassStatement] = []
+    public var properties: [String: String] = [:]
+    
+    public init(_ collection: [T], _ body: (T) -> OverpassStatement) {
+        self.contents = collection.map( { body($0) } )
+    }
+    
+    public init(_ collection: [T], _ body: (Int, T) -> OverpassStatement) {
+        self.contents = collection.enumerated().map( { body($0, $1) } )
+    }
+    
+    public init(_ collection: [T], @OFBuilder _ body: (Int, T) -> [OverpassStatement]) {
+        self.contents = collection.enumerated().flatMap( { body($0, $1) } )
+    }
+}
+
+public struct If: OverpassStatement {
+    public var name = ""
+    public var contents: [OverpassStatement] = []
+    public var properties: [String: String] = [:]
+    
+    public init(_ condition: Bool, @OFBuilder content: OFBuilderSClosure) {
+        if condition {
+            self.contents = [content(), ]
+        }
+    }
+    
+    public init(_ condition: Bool, @OFBuilder contents: OFBuilderMClosure) {
+        if condition {
+            self.contents = contents()
+        }
+    }
+
+    public init(_ condition: Bool, @OFBuilder trueContent: OFBuilderSClosure, @OFBuilder falseContent: OFBuilderSClosure) {
+        if condition {
+            self.contents = [trueContent(), ]
+        } else {
+            self.contents = [falseContent(), ]
+        }
+    }
+    
+    public init(_ condition: Bool, @OFBuilder trueContents: OFBuilderMClosure, @OFBuilder falseContent: OFBuilderSClosure) {
+        if condition {
+            self.contents = trueContents()
+        } else {
+            self.contents = [falseContent(), ]
+        }
+    }
+    
+    public init(_ condition: Bool, @OFBuilder trueContent: OFBuilderSClosure, @OFBuilder falseContents: OFBuilderMClosure) {
+        if condition {
+            self.contents = [trueContent(), ]
+        } else {
+            self.contents = falseContents()
+        }
+    }
+    
+    public init(_ condition: Bool, @OFBuilder trueContents: OFBuilderMClosure, @OFBuilder falseContents: OFBuilderMClosure) {
+        if condition {
+            self.contents = trueContents()
+        } else {
+            self.contents = falseContents()
+        }
     }
 }

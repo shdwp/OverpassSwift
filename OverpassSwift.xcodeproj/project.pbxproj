@@ -16,6 +16,7 @@
 		3B3DE90D22B7F62C0019E30F /* OverpassProtocol.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3B3DE90922B7F62C0019E30F /* OverpassProtocol.swift */; };
 		3B3DE91022B7F6FF0019E30F /* LibXML.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3B3DE90F22B7F6FF0019E30F /* LibXML.swift */; };
 		3B3DE91422B7F79D0019E30F /* libxml2.tbd in Frameworks */ = {isa = PBXBuildFile; fileRef = 3B3DE91322B7F7260019E30F /* libxml2.tbd */; };
+		3B55BB3B22BB3812003B2181 /* OverpassTypes.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3B55BB3A22BB3812003B2181 /* OverpassTypes.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -41,6 +42,7 @@
 		3B3DE90922B7F62C0019E30F /* OverpassProtocol.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = OverpassProtocol.swift; sourceTree = "<group>"; };
 		3B3DE90F22B7F6FF0019E30F /* LibXML.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = LibXML.swift; sourceTree = "<group>"; };
 		3B3DE91322B7F7260019E30F /* libxml2.tbd */ = {isa = PBXFileReference; lastKnownFileType = "sourcecode.text-based-dylib-definition"; name = libxml2.tbd; path = usr/lib/libxml2.tbd; sourceTree = SDKROOT; };
+		3B55BB3A22BB3812003B2181 /* OverpassTypes.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OverpassTypes.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -91,6 +93,7 @@
 				3B3DE90722B7F62C0019E30F /* OverpassLanguage.swift */,
 				3B3DE90822B7F62C0019E30F /* OverpassModels.swift */,
 				3B3DE90922B7F62C0019E30F /* OverpassProtocol.swift */,
+				3B55BB3A22BB3812003B2181 /* OverpassTypes.swift */,
 			);
 			path = OverpassSwift;
 			sourceTree = "<group>";
@@ -239,6 +242,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				3B55BB3B22BB3812003B2181 /* OverpassTypes.swift in Sources */,
 				3B3DE90C22B7F62C0019E30F /* OverpassModels.swift in Sources */,
 				3B3DE90B22B7F62C0019E30F /* OverpassLanguage.swift in Sources */,
 				3B3DE90D22B7F62C0019E30F /* OverpassProtocol.swift in Sources */,

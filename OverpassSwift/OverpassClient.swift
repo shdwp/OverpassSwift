@@ -9,7 +9,9 @@
 import Foundation
 import Combine
 
+/// HTTP Client
 public struct OverpassClient {
+    /// PasstroughSubject wrapper that also holds reference to DataTask
     private struct Subject: Publisher {
         typealias Output = OverpassResult
         typealias Failure = Error
@@ -26,22 +28,30 @@ public struct OverpassClient {
         }
     }
     
+    /// host url
     public let url: URL
-    let urlSession = URLSession(configuration: URLSessionConfiguration.default, delegate: nil, delegateQueue: OperationQueue.main)
+    
+    internal let urlSession = URLSession(configuration: URLSessionConfiguration.default, delegate: nil, delegateQueue: OperationQueue.main)
     
     public init(_ url: URL) {
         self.url = url
     }
     
+    /// Make HTTP request
+    /// - Parameter apiRequest: request instance
+    /// - Returns: Publisher that will receive OverpassResult + completion
     public func request(_ apiRequest: OverpassRequest) -> AnyPublisher<OverpassResult, Error> {
         var passtrough = OverpassClient.Subject()
+        
+        // create request
         var request = URLRequest(url: self.url)
         request.httpMethod = "POST"
         request.httpBody = apiRequest.requestData
 
+        // create data task
         let task = self.urlSession.dataTask(with: request) { (data, response, error) in
              if let data = data {
-                switch OverpassResponse(box: apiRequest.box, data: data) {
+                switch OverpassResponse(bounds: apiRequest.bounds, data: data) {
                 case .result(let result):
                     passtrough.subject.send(result)
                     passtrough.subject.send(completion: .finished)
@@ -53,7 +63,9 @@ public struct OverpassClient {
             }
         }
         
+        // retain task by subject
         passtrough.task = task
+        
         task.resume()
         
         return AnyPublisher(passtrough)
